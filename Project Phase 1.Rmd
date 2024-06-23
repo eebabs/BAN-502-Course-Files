@@ -1,0 +1,159 @@
+---
+title: "Project Phase 1"
+author: "Elizabeth Babin"
+date: "2024-06-10"
+output: word_document
+---
+
+Libraries
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(gridExtra)
+library(GGally)
+library(mice)
+library(VIM)
+library(skimr)
+library(naniar)
+library(UpSetR)
+```
+
+Read in the data set. 
+```{r}
+data <- read_csv("train.csv")
+```
+
+Structure and summary
+```{r}
+str(data)
+summary(data)
+skim(data)
+```
+
+Factor conversion 
+```{r}
+data <- data %>%
+  mutate(product_code = as_factor(product_code)) %>%
+  mutate(attribute_0 = as_factor(attribute_0)) %>%
+  mutate(attribute_1 = as_factor(attribute_1)) %>%
+  mutate(failure = as_factor(failure))
+```
+
+```{r}
+str(data)
+```
+
+Analyzing missingness
+```{r}
+gg_miss_var(data)
+```
+
+```{r}
+vis_miss(data) 
+```
+Imputate
+```{r}
+set.seed(1234)
+imp_loading <- mice(data, m = 5, method = "pmm", printFlag = FALSE)
+
+data_complete <- complete(imp_loading)
+summary(data_complete)
+```
+
+Visualization of Data Complete
+```{r}
+p1 = ggplot(data_complete, aes(x = product_code, fill = failure)) + geom_bar(position = "fill") 
+p2 = ggplot(data_complete, aes(x = attribute_0, fill = failure)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 45, size = 7))
+p3 = ggplot(data_complete, aes(x = attribute_1, fill = failure)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 45, size = 7))
+p4 = ggplot(data_complete, aes(x = attribute_2, fill = failure)) + geom_bar(position = "fill")
+p5 = ggplot(data_complete, aes(x = attribute_3, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1, p2, p3, p4, p5)
+
+p1 = ggplot(data_complete, aes(x = failure, y = measurement_0)) + geom_boxplot()
+p2 = ggplot(data_complete, aes(x = failure, y = measurement_1)) + geom_boxplot()
+p3 = ggplot(data_complete, aes(x = failure, y = measurement_2)) + geom_boxplot()
+p4 = ggplot(data_complete, aes(x = failure, y = measurement_3)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_complete, aes(x = failure, y = measurement_4)) + geom_boxplot()
+p2 = ggplot(data_complete, aes(x = failure, y = measurement_5)) + geom_boxplot()
+p3 = ggplot(data_complete, aes(x = failure, y = measurement_6)) + geom_boxplot()
+p4 = ggplot(data_complete, aes(x = failure, y = measurement_7)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_complete, aes(x = failure, y = measurement_8)) + geom_boxplot()
+p2 = ggplot(data_complete, aes(x = failure, y = measurement_9)) + geom_boxplot()
+p3 = ggplot(data_complete, aes(x = failure, y = measurement_10)) + geom_boxplot()
+p4 = ggplot(data_complete, aes(x = failure, y = measurement_11)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_complete, aes(x = failure, y = measurement_12)) + geom_boxplot()
+p2 = ggplot(data_complete, aes(x = failure, y = measurement_13)) + geom_boxplot()
+p3 = ggplot(data_complete, aes(x = failure, y = measurement_14)) + geom_boxplot()
+p4 = ggplot(data_complete, aes(x = failure, y = measurement_15)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_complete, aes(x = failure, y = measurement_16)) + geom_boxplot()
+p2 = ggplot(data_complete, aes(x = failure, y = measurement_17)) + geom_boxplot()
+grid.arrange(p1, p2, ncol = 2)
+```
+
+Creating new columns
+```{r}
+data_complete$total_amount <- rowSums(data_complete[, 8:25])
+
+data_complete <- unite(data_complete, attributes, starts_with("attribute"), sep = "-", remove = FALSE)
+```
+
+Visualizations of created columns
+```{r}
+ggplot(data_complete, aes(x = failure, y = total_amount)) + geom_boxplot()
+
+ggplot(data_complete, aes(y = attributes, fill = failure)) + geom_bar(position = "fill")
+```
+
+Comparing imputation to row deletion
+```{r}
+data_rowdel <- data %>%
+  drop_na()
+```
+
+Visualizations of data with rows deleted
+```{r}
+p1 = ggplot(data_rowdel, aes(x = product_code, fill = failure)) + geom_bar(position = "fill") 
+p2 = ggplot(data_rowdel, aes(x = attribute_0, fill = failure)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 45, size = 7))
+p3 = ggplot(data_rowdel, aes(x = attribute_1, fill = failure)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 45, size = 7))
+p4 = ggplot(data_rowdel, aes(x = attribute_2, fill = failure)) + geom_bar(position = "fill")
+p5 = ggplot(data_rowdel, aes(x = attribute_3, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1, p2, p3, p4, p5)
+
+p1 = ggplot(data_rowdel, aes(x = failure, y = measurement_0)) + geom_boxplot()
+p2 = ggplot(data_rowdel, aes(x = failure, y = measurement_1)) + geom_boxplot()
+p3 = ggplot(data_rowdel, aes(x = failure, y = measurement_2)) + geom_boxplot()
+p4 = ggplot(data_rowdel, aes(x = failure, y = measurement_3)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_rowdel, aes(x = failure, y = measurement_4)) + geom_boxplot()
+p2 = ggplot(data_rowdel, aes(x = failure, y = measurement_5)) + geom_boxplot()
+p3 = ggplot(data_rowdel, aes(x = failure, y = measurement_6)) + geom_boxplot()
+p4 = ggplot(data_rowdel, aes(x = failure, y = measurement_7)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_rowdel, aes(x = failure, y = measurement_8)) + geom_boxplot()
+p2 = ggplot(data_rowdel, aes(x = failure, y = measurement_9)) + geom_boxplot()
+p3 = ggplot(data_rowdel, aes(x = failure, y = measurement_10)) + geom_boxplot()
+p4 = ggplot(data_rowdel, aes(x = failure, y = measurement_11)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_rowdel, aes(x = failure, y = measurement_12)) + geom_boxplot()
+p2 = ggplot(data_rowdel, aes(x = failure, y = measurement_13)) + geom_boxplot()
+p3 = ggplot(data_rowdel, aes(x = failure, y = measurement_14)) + geom_boxplot()
+p4 = ggplot(data_rowdel, aes(x = failure, y = measurement_15)) + geom_boxplot()
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+p1 = ggplot(data_rowdel, aes(x = failure, y = measurement_16)) + geom_boxplot()
+p2 = ggplot(data_rowdel, aes(x = failure, y = measurement_17)) + geom_boxplot()
+grid.arrange(p1, p2, ncol = 2)
+```
+
+

@@ -1,0 +1,193 @@
+---
+title: "XGBoost"
+author: "Elizabeth Babin"
+date: "2024-06-12"
+output: word_document
+---
+
+Libraries
+```{r setup, include=FALSE}
+library(titanic)
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(mice)
+library(VIM)
+library(ranger)
+library(randomForest)
+library(RColorBrewer)
+library(rattle)
+library(e1071)
+library(xgboost)
+library(usemodels)
+```
+
+Load Titanic data from the titanic package. 
+```{r}
+titanic <- titanic::titanic_train
+```
+
+Factor conversion. Several of our variables are categorical and should be converted to factors. 
+```{r}
+titanic <- titanic %>%
+  mutate(Survived = as_factor(Survived)) %>%
+  mutate(Survived = fct_recode(Survived, "No" = "0", "Yes" = "1")) %>%
+  mutate(Pclass = as_factor(Pclass)) %>%
+  mutate(Sex = as_factor(Sex)) %>%
+  mutate(Embarked = as_factor(Embarked)) %>%
+  mutate(Embarked = fct_recode(Embarked, Unknown = "")) %>%
+  select(Survived, Pclass, Sex, Age, SibSp, Parch)
+
+set.seed(123)
+imp_age <- mice(titanic, m = 5, method = "pmm", printFlag = FALSE)
+titanic_complete <- complete(imp_age)
+summary(titanic_complete)
+```
+Training/testing split
+```{r}
+set.seed(123)
+titanic_split <- initial_split(titanic_complete, prop = 0.7, strata = Survived)
+train <- training(titanic_split)
+test <- testing(titanic_split)
+```
+
+XGBoost model
+```{r}
+#use_xgboost(Survived ~., train) #comment me out before knitting
+```
+
+```{r}
+set.seed(123)
+folds = vfold_cv(train, v = 5)
+```
+
+Copy and paste the model from the use_xgboost function. Modify a few elements. 
+```{r}
+start_time = Sys.time() #for timing
+
+xgboost_recipe <- 
+  recipe(formula = Survived ~ ., data = train) %>% 
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE) %>%
+  step_zv(all_predictors()) 
+
+xgboost_spec <- 
+  boost_tree(trees = tune(), min_n = tune(), tree_depth = tune(), learn_rate = tune(), 
+    loss_reduction = tune(), sample_size = tune()) %>% 
+  set_mode("classification") %>% 
+  set_engine("xgboost") 
+
+xgboost_workflow <- 
+  workflow() %>% 
+  add_recipe(xgboost_recipe) %>% 
+  add_model(xgboost_spec) 
+
+set.seed(77680)
+xgboost_tune <-
+  tune_grid(xgboost_workflow, resamples = folds, grid = 25)
+
+end_time = Sys.time()
+end_time - start_time
+```
+
+```{r}
+best_xbg <- select_best(xgboost_tune, metric = "accuracy")
+
+final_xgb <- finalize_workflow(
+  xgboost_workflow, 
+  best_xbg
+)
+
+final_xgb
+```
+
+Fit the finalized workflow to our training data
+```{r}
+final_xgb_fit <- fit(final_xgb, train)
+```
+
+```{r}
+trainpredxgb <- predict(final_xgb_fit, train)
+head(trainpredxgb)
+```
+
+Confusion matrix
+```{r}
+confusionMatrix(trainpredxgb$.pred_class, train$Survived, positive = "Yes")
+```
+
+```{r}
+testpredxgb <- predict(final_xgb_fit, test)
+```
+
+```{r}
+confusionMatrix(testpredxgb$.pred_class, test$Survived, positive = "Yes")
+```
+
+Next up is an xgb model with considerable tuning
+```{r}
+#use_xgboost(Survived ~., train) #comment me out before knitting
+```
+
+```{r}
+start_time = Sys.time()
+
+#translations of package parameters shown here: https://parsnip.tidymodels.org/reference/boost_tree.html
+tgrid = expand.grid(
+  trees = 100,
+  min_n = 1,
+  tree_depth = c(1,2,3,4),
+  learn_rate = c(0.01, 0.1, 0.2, 0.3),
+  loss_reduction = 0,
+  sample_size = c(0.8, 1)
+)
+
+xgboost_recipe <- 
+  recipe(formula = Survived ~ ., data = train) %>% 
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE) %>%
+  step_zv(all_predictors()) 
+
+xgboost_spec <- 
+  boost_tree(trees = tune(), min_n = tune(), tree_depth = tune(), learn_rate = tune(), 
+    loss_reduction = tune(), sample_size = tune()) %>% 
+  set_mode("classification") %>% 
+  set_engine("xgboost") 
+
+xgboost_workflow <- 
+  workflow() %>% 
+  add_recipe(xgboost_recipe) %>% 
+  add_model(xgboost_spec) 
+
+set.seed(70799)
+xgboost_tune2 <-
+  tune_grid(xgboost_workflow, resamples = folds, grid = tgrid)
+
+end_time = Sys.time()
+end_time - start_time
+```
+
+```{r}
+best_xbg2 <- select_best(xgboost_tune2, metric = "accuracy")
+
+final_xgb2 <- finalize_workflow(
+  xgboost_workflow,
+  best_xbg2
+)
+
+final_xgb2
+```
+
+Fit the finalized workflow to our training data
+```{r}
+final_xgb_fit2 <- fit(final_xgb2, train)
+```
+
+```{r}
+trainpredxgb2 <- predict(final_xgb_fit2, train)
+confusionMatrix(trainpredxgb2$.pred_class, train$Survived, positive = "Yes")
+```
+
+```{r}
+testpredxgb2 <- predict(final_xgb_fit2, test)
+confusionMatrix(testpredxgb2$.pred_class, test$Survived, positive = "Yes")
+```
+
